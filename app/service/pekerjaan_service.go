@@ -15,6 +15,7 @@ import (
 func GetAllPekerjaan() ([]models.Pekerjaan, error) {
 	return repository.GetAllPekerjaanRepo()
 }
+
 func GetPekerjaanByID(id int) (models.Pekerjaan, error) {
 	return repository.GetPekerjaanByIDRepo(id)
 }
@@ -151,4 +152,188 @@ func SoftDeletePekerjaanRepo(id int, userRole string, userID int) error {
         `, id, userID)
 		return err
 	}
+}
+
+// GetTrashPekerjaan - ambil semua pekerjaan yang sudah di-soft delete (HANYA ADMIN YES)
+func GetTrashPekerjaan() ([]models.Pekerjaan, error) {
+	return repository.GetTrashRepo()
+}
+
+// RestorePekerjaan - restore pekerjaan dari trash (admin only)
+func RestorePekerjaan(id int) error {
+	return repository.RestoreRepo(id)
+}
+
+// HardDeletePekerjaan - hapus permanent dari database (admin only)
+func HardDeletePekerjaan(id int) error {
+	return repository.HardDeleteRepo(id)
+}
+
+// GetMyTrashPekerjaan - user lihat trash milik sendiri
+func GetMyTrashPekerjaan(userID int) ([]models.Pekerjaan, error) {
+	return repository.GetMyTrashRepo(userID)
+}
+
+// RestoreMyPekerjaan - user restore pekerjaan milik sendiri
+func RestoreMyPekerjaan(id int, userID int) error {
+	return repository.RestoreMyRepo(id, userID)
+}
+
+// HardDeleteMyPekerjaan - user hard delete pekerjaan milik sendiri
+func HardDeleteMyPekerjaan(id int, userID int) error {
+	return repository.HardDeleteMyRepo(id, userID)
+}
+
+// ================================================================
+// 🗑️ TRASH MANAGEMENT SERVICES
+// ================================================================
+
+// GetTrashService - service untuk lihat semua trash (ADMIN ONLY)
+func GetTrashService(c *fiber.Ctx) error {
+	role := c.Locals("role").(string)
+	if role != "admin" {
+		return c.Status(403).JSON(fiber.Map{"error": "Akses ditolak. Hanya admin yang diizinkan"})
+	}
+
+	trashList, err := GetTrashPekerjaan()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Gagal mengambil data trash"})
+	}
+	return c.JSON(fiber.Map{"success": true, "data": trashList})
+}
+
+// RestoreService - service untuk restore dari trash (ADMIN ONLY)
+func RestoreService(c *fiber.Ctx) error {
+	role := c.Locals("role").(string)
+	if role != "admin" {
+		return c.Status(403).JSON(fiber.Map{"error": "Akses ditolak. Hanya admin yang diizinkan"})
+	}
+
+	id, _ := strconv.Atoi(c.Params("id"))
+	if err := RestorePekerjaan(id); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"success": true, "message": "Pekerjaan berhasil di-restore"})
+}
+
+// HardDeleteService - service untuk hard delete (ADMIN ONLY)
+func HardDeleteService(c *fiber.Ctx) error {
+	role := c.Locals("role").(string)
+	if role != "admin" {
+		return c.Status(403).JSON(fiber.Map{"error": "Akses ditolak. Hanya admin yang diizinkan"})
+	}
+
+	id, _ := strconv.Atoi(c.Params("id"))
+	if err := HardDeletePekerjaan(id); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"success": true, "message": "Pekerjaan berhasil dihapus permanent"})
+}
+
+// SoftDeleteService - service untuk soft delete (user/admin)
+func SoftDeleteService(c *fiber.Ctx) error {
+	id, _ := strconv.Atoi(c.Params("id"))
+	userID := c.Locals("user_id").(int)
+	role := c.Locals("role").(string)
+
+	if err := SoftDeletePekerjaan(id, userID, role); err != nil {
+		return c.Status(403).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"success": true, "message": "Pekerjaan berhasil dihapus (soft delete)"})
+}
+
+// GetMyTrashService - user service untuk lihat trash milik sendiri
+func GetMyTrashService(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(int)
+	trashList, err := GetMyTrashPekerjaan(userID)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Gagal mengambil data trash"})
+	}
+	return c.JSON(fiber.Map{"success": true, "data": trashList})
+}
+
+// RestoreMyService - user service untuk restore milik sendiri
+func RestoreMyService(c *fiber.Ctx) error {
+	id, _ := strconv.Atoi(c.Params("id"))
+	userID := c.Locals("user_id").(int)
+
+	if err := RestoreMyPekerjaan(id, userID); err != nil {
+		return c.Status(403).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"success": true, "message": "Pekerjaan berhasil di-restore"})
+}
+
+// HardDeleteMyService - user service untuk hard delete milik sendiri
+func HardDeleteMyService(c *fiber.Ctx) error {
+	id, _ := strconv.Atoi(c.Params("id"))
+	userID := c.Locals("user_id").(int)
+
+	if err := HardDeleteMyPekerjaan(id, userID); err != nil {
+		return c.Status(403).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"success": true, "message": "Pekerjaan berhasil dihapus permanen"})
+}
+
+// ================================================================
+// 📋 ADDITIONAL CLEAN SERVICE FUNCTIONS
+// ================================================================
+
+// GetPekerjaanByIDService - service untuk get pekerjaan by ID
+func GetPekerjaanByIDService(c *fiber.Ctx) error {
+	id, _ := strconv.Atoi(c.Params("id"))
+	p, err := GetPekerjaanByID(id)
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Pekerjaan tidak ditemukan"})
+	}
+	return c.JSON(fiber.Map{"success": true, "data": p})
+}
+
+// GetPekerjaanByAlumniService - service untuk get pekerjaan by alumni ID (ADMIN ONLY)
+func GetPekerjaanByAlumniService(c *fiber.Ctx) error {
+	role := c.Locals("role").(string)
+	if role != "admin" {
+		return c.Status(403).JSON(fiber.Map{"error": "Akses ditolak. Hanya admin yang diizinkan"})
+	}
+
+	alumniID, _ := strconv.Atoi(c.Params("alumni_id"))
+	list, err := GetPekerjaanByAlumni(alumniID)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Gagal ambil data"})
+	}
+	return c.JSON(fiber.Map{"success": true, "data": list})
+}
+
+// CreatePekerjaanService - service untuk create pekerjaan (ADMIN ONLY)
+func CreatePekerjaanService(c *fiber.Ctx) error {
+	role := c.Locals("role").(string)
+	if role != "admin" {
+		return c.Status(403).JSON(fiber.Map{"error": "Akses ditolak. Hanya admin yang diizinkan"})
+	}
+
+	var p models.Pekerjaan
+	if err := c.BodyParser(&p); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Body tidak valid"})
+	}
+	if err := CreatePekerjaan(&p); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Gagal insert pekerjaan"})
+	}
+	return c.Status(201).JSON(fiber.Map{"success": true, "data": p})
+}
+
+// UpdatePekerjaanService - service untuk update pekerjaan (ADMIN ONLY)
+func UpdatePekerjaanService(c *fiber.Ctx) error {
+	role := c.Locals("role").(string)
+	if role != "admin" {
+		return c.Status(403).JSON(fiber.Map{"error": "Akses ditolak. Hanya admin yang diizinkan"})
+	}
+
+	id, _ := strconv.Atoi(c.Params("id"))
+	var p models.Pekerjaan
+	if err := c.BodyParser(&p); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Body tidak valid"})
+	}
+	if err := UpdatePekerjaan(id, &p); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Gagal update pekerjaan"})
+	}
+	return c.JSON(fiber.Map{"success": true, "message": "Data pekerjaan berhasil diupdate"})
 }
