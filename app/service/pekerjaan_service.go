@@ -3,9 +3,6 @@ package service
 import (
 	"crud-alumni/app/models"
 	"crud-alumni/app/repository"
-	"crud-alumni/database"
-	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -75,7 +72,6 @@ func GetPekerjaanService(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Gagal menghitung data pekerjaan"})
 	}
 
-	// Bentuk response
 	response := models.PekerjaanResponse{
 		Data: pekerjaan,
 		Meta: models.MetaInfo{
@@ -93,7 +89,6 @@ func GetPekerjaanService(c *fiber.Ctx) error {
 }
 
 func SoftDeletePekerjaan(pekerjaanID int, uid interface{}, role string) error {
-	// casting user_id dari token (c.Locals)
 	var userID int
 	switch v := uid.(type) {
 	case int:
@@ -107,176 +102,123 @@ func SoftDeletePekerjaan(pekerjaanID int, uid interface{}, role string) error {
 		userID = 0
 	}
 
-	fmt.Println("SoftDelete Debug -> pekerjaanID:", pekerjaanID, "userID:", userID, "role:", role)
-
-	// kalau role = user biasa → cek kepemilikan
-	if role == "user" {
-		var count int
-		err := database.DB.QueryRow(`
-			SELECT COUNT(*)
-			FROM pekerjaan_alumni pa
-			JOIN alumni a ON pa.alumni_id = a.id
-			WHERE pa.id = $1 
-			  AND a.user_id = $2 
-			  AND pa.is_delete = false
-		`, pekerjaanID, userID).Scan(&count)
-
-		if err != nil {
-			return err
-		}
-
-		fmt.Println("SoftDelete Debug -> hasil cek kepemilikan count:", count)
-
-		if count == 0 {
-			return errors.New("tidak diizinkan hapus pekerjaan orang lain")
-		}
-	}
-
-	// lakukan soft delete
-	return repository.SoftDeletePekerjaanRepo(pekerjaanID, userID)
+	return repository.SoftDeletePekerjaan(pekerjaanID, userID, role)
 }
 
-func SoftDeletePekerjaanRepo(id int, userRole string, userID int) error {
-	if userRole == "admin" {
-		// admin boleh hapus siapa saja
-		_, err := database.DB.Exec(`
-            UPDATE pekerjaan_alumni SET deleted_at=NOW() WHERE id=$1
-        `, id)
-		return err
-	} else {
-		// user hanya boleh hapus miliknya sendiri
-		_, err := database.DB.Exec(`
-            UPDATE pekerjaan_alumni 
-            SET deleted_at=NOW() 
-            WHERE id=$1 AND alumni_id=$2
-        `, id, userID)
-		return err
-	}
-}
-
-// GetTrashPekerjaan - ambil semua pekerjaan yang sudah di-soft delete (HANYA ADMIN YES)
 func GetTrashPekerjaan() ([]models.Pekerjaan, error) {
 	return repository.GetTrashRepo()
 }
 
-// RestorePekerjaan - restore pekerjaan dari trash (admin only)
 func RestorePekerjaan(id int) error {
 	return repository.RestoreRepo(id)
 }
 
-// HardDeletePekerjaan - hapus permanent dari database (admin only)
 func HardDeletePekerjaan(id int) error {
 	return repository.HardDeleteRepo(id)
 }
 
-// GetMyTrashPekerjaan - user lihat trash milik sendiri
 func GetMyTrashPekerjaan(userID int) ([]models.Pekerjaan, error) {
 	return repository.GetMyTrashRepo(userID)
 }
 
-// RestoreMyPekerjaan - user restore pekerjaan milik sendiri
 func RestoreMyPekerjaan(id int, userID int) error {
 	return repository.RestoreMyRepo(id, userID)
 }
 
-// HardDeleteMyPekerjaan - user hard delete pekerjaan milik sendiri
 func HardDeleteMyPekerjaan(id int, userID int) error {
 	return repository.HardDeleteMyRepo(id, userID)
 }
 
-// ================================================================
-// 🗑️ TRASH MANAGEMENT SERVICES
-// ================================================================
+// UNIFIED TRASH MANAGEMENT SERVICES
 
-// GetTrashService - service untuk lihat semua trash (ADMIN ONLY)
-func GetTrashService(c *fiber.Ctx) error {
+func GetTrashUnifiedService(c *fiber.Ctx) error {
 	role := c.Locals("role").(string)
-	if role != "admin" {
-		return c.Status(403).JSON(fiber.Map{"error": "Akses ditolak. Hanya admin yang diizinkan"})
+	userID := c.Locals("user_id").(int)
+
+	var trashList []models.Pekerjaan
+	var err error
+
+	if role == "admin" {
+		trashList, err = GetTrashPekerjaan()
+	} else {
+		trashList, err = GetMyTrashPekerjaan(userID)
 	}
 
-	trashList, err := GetTrashPekerjaan()
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Gagal mengambil data trash"})
 	}
 	return c.JSON(fiber.Map{"success": true, "data": trashList})
 }
 
-// RestoreService - service untuk restore dari trash (ADMIN ONLY)
-func RestoreService(c *fiber.Ctx) error {
+func RestoreUnifiedService(c *fiber.Ctx) error {
+	id, _ := strconv.Atoi(c.Params("id"))
 	role := c.Locals("role").(string)
-	if role != "admin" {
-		return c.Status(403).JSON(fiber.Map{"error": "Akses ditolak. Hanya admin yang diizinkan"})
+	userID := c.Locals("user_id").(int)
+
+	var err error
+	if role == "admin" {
+		err = RestorePekerjaan(id)
+	} else {
+		err = RestoreMyPekerjaan(id, userID)
 	}
 
-	id, _ := strconv.Atoi(c.Params("id"))
-	if err := RestorePekerjaan(id); err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	if err != nil {
+		return c.Status(403).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.JSON(fiber.Map{"success": true, "message": "Pekerjaan berhasil di-restore"})
 }
 
-// HardDeleteService - service untuk hard delete (ADMIN ONLY)
-func HardDeleteService(c *fiber.Ctx) error {
+func HardDeleteUnifiedService(c *fiber.Ctx) error {
+	id, _ := strconv.Atoi(c.Params("id"))
 	role := c.Locals("role").(string)
-	if role != "admin" {
-		return c.Status(403).JSON(fiber.Map{"error": "Akses ditolak. Hanya admin yang diizinkan"})
+	userIDRaw := c.Locals("user_id")
+
+	// Handle konversi float64 ke int
+	var userID int
+	switch v := userIDRaw.(type) {
+	case float64:
+		userID = int(v)
+	case int:
+		userID = v
+	default:
+		return c.Status(500).JSON(fiber.Map{"error": "Invalid user ID type"})
 	}
 
-	id, _ := strconv.Atoi(c.Params("id"))
-	if err := HardDeletePekerjaan(id); err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	var err error
+	if role == "admin" {
+		err = HardDeletePekerjaan(id)
+	} else {
+		err = HardDeleteMyPekerjaan(id, userID)
 	}
-	return c.JSON(fiber.Map{"success": true, "message": "Pekerjaan berhasil dihapus permanent"})
+
+	if err != nil {
+		return c.Status(403).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"success": true, "message": "Pekerjaan berhasil dihapus permanen"})
 }
 
-// SoftDeleteService - service untuk soft delete (user/admin)
+// SoftDeleteService - service untuk soft delete (unified untuk admin dan user)
 func SoftDeleteService(c *fiber.Ctx) error {
 	id, _ := strconv.Atoi(c.Params("id"))
-	userID := c.Locals("user_id").(int)
+	userIDRaw := c.Locals("user_id")
 	role := c.Locals("role").(string)
+
+	// Handle konversi float64 ke int
+	var userID int
+	switch v := userIDRaw.(type) {
+	case float64:
+		userID = int(v)
+	case int:
+		userID = v
+	default:
+		return c.Status(500).JSON(fiber.Map{"error": "Invalid user ID type"})
+	}
 
 	if err := SoftDeletePekerjaan(id, userID, role); err != nil {
 		return c.Status(403).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.JSON(fiber.Map{"success": true, "message": "Pekerjaan berhasil dihapus (soft delete)"})
 }
-
-// GetMyTrashService - user service untuk lihat trash milik sendiri
-func GetMyTrashService(c *fiber.Ctx) error {
-	userID := c.Locals("user_id").(int)
-	trashList, err := GetMyTrashPekerjaan(userID)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Gagal mengambil data trash"})
-	}
-	return c.JSON(fiber.Map{"success": true, "data": trashList})
-}
-
-// RestoreMyService - user service untuk restore milik sendiri
-func RestoreMyService(c *fiber.Ctx) error {
-	id, _ := strconv.Atoi(c.Params("id"))
-	userID := c.Locals("user_id").(int)
-
-	if err := RestoreMyPekerjaan(id, userID); err != nil {
-		return c.Status(403).JSON(fiber.Map{"error": err.Error()})
-	}
-	return c.JSON(fiber.Map{"success": true, "message": "Pekerjaan berhasil di-restore"})
-}
-
-// HardDeleteMyService - user service untuk hard delete milik sendiri
-func HardDeleteMyService(c *fiber.Ctx) error {
-	id, _ := strconv.Atoi(c.Params("id"))
-	userID := c.Locals("user_id").(int)
-
-	if err := HardDeleteMyPekerjaan(id, userID); err != nil {
-		return c.Status(403).JSON(fiber.Map{"error": err.Error()})
-	}
-	return c.JSON(fiber.Map{"success": true, "message": "Pekerjaan berhasil dihapus permanen"})
-}
-
-// ================================================================
-// 📋 ADDITIONAL CLEAN SERVICE FUNCTIONS
-// ================================================================
 
 // GetPekerjaanByIDService - service untuk get pekerjaan by ID
 func GetPekerjaanByIDService(c *fiber.Ctx) error {

@@ -8,13 +8,21 @@ import (
 )
 
 type Config struct {
+	// PostgreSQL Config
 	DBHost     string
 	DBPort     string
 	DBUser     string
 	DBPassword string
 	DBName     string
-	JWTSecret  string
-	AppPort    string
+
+	// MongoDB Config
+	MongoURI    string
+	MongoDBName string
+	UseMongoDB  bool
+
+	// App Config
+	JWTSecret string
+	AppPort   string
 }
 
 var Cfg *Config
@@ -27,13 +35,21 @@ func LoadConfig() {
 	}
 
 	Cfg = &Config{
+		// PostgreSQL Config
 		DBHost:     getEnv("DB_HOST", "localhost"),
 		DBPort:     getEnv("DB_PORT", "5432"),
 		DBUser:     getEnv("DB_USER", "postgres"),
 		DBPassword: getEnv("DB_PASSWORD", "postgres"),
 		DBName:     getEnv("DB_NAME", "crud_alumni"),
-		JWTSecret:  getEnv("JWT_SECRET", "mysecretkey"),
-		AppPort:    getEnv("APP_PORT", "3000"),
+
+		// MongoDB Config
+		MongoURI:    getEnv("MONGODB_URI", "mongodb://localhost:27017"),
+		MongoDBName: getEnv("MONGODB_DATABASE", "alumni_db"),
+		UseMongoDB:  getEnv("USE_MONGODB", "") == "true",
+
+		// App Config
+		JWTSecret: getEnv("JWT_SECRET", "mysecretkey"),
+		AppPort:   getEnv("APP_PORT", "3000"),
 	}
 }
 

@@ -3,8 +3,9 @@ package main
 import (
 	"crud-alumni/app/route"
 	"crud-alumni/database"
-	"github.com/gofiber/fiber/v2"
 	"log"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 func main() {
@@ -24,6 +25,8 @@ func main() {
 	// route alumni & pekerjaan (sudah ada middleware di dalamnya)
 	route.AlumniRoutes(api)
 	route.PekerjaanRoutes(api)
+	route.SetupFileRoutes(api)      // Tambah route untuk upload file
+	route.MongoPekerjaanRoutes(api) // Tambah route untuk MongoDB pekerjaan
 
 	// listen server
 	log.Fatal(app.Listen(":3000"))

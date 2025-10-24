@@ -7,11 +7,13 @@ import (
 )
 
 type User struct {
-	ID        int       `json:"id"`
-	Username  string    `json:"username"`
-	Email     string    `json:"email"`
-	Role      string    `json:"role"`
-	CreatedAt time.Time `json:"created_at"`
+	ID        interface{} `json:"id" bson:"_id,omitempty"`
+	Username  string      `json:"username" bson:"username"`
+	Password  string      `json:"-" bson:"password"`
+	Email     string      `json:"email" bson:"email"`
+	Role      string      `json:"role" bson:"role"`
+	CreatedAt time.Time   `json:"created_at" bson:"created_at"`
+	UpdatedAt time.Time   `json:"updated_at" bson:"updated_at"`
 }
 
 type LoginRequest struct {
@@ -25,8 +27,8 @@ type LoginResponse struct {
 }
 
 type JWTClaims struct {
-	UserID   int    `json:"user_id"`
-	Username string `json:"username"`
-	Role     string `json:"role"`
+	UserID   interface{} `json:"user_id"`
+	Username string      `json:"username"`
+	Role     string      `json:"role"`
 	jwt.RegisteredClaims
 }
