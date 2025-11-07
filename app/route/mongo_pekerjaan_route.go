@@ -1,40 +1,15 @@
 package route
 
 import (
-	"crud-alumni/app/service"
+	"crud-alumni/app/service/mongo"
 	"crud-alumni/middleware"
-	"fmt"
 
 	"github.com/gofiber/fiber/v2"
 )
 
 func MongoPekerjaanRoutes(app fiber.Router) {
-	mongoService := service.NewMongoPekerjaanService()
-
+	mongoService := mongo.NewPekerjaanService()
 	r := app.Group("/mongo/pekerjaan")
-
-	// Migration route (admin only)
-	r.Post("/migrate", middleware.AuthRequired(), func(c *fiber.Ctx) error {
-		role := c.Locals("role").(string)
-		if role != "admin" {
-			return c.Status(403).JSON(fiber.Map{
-				"success": false,
-				"error":   "Only admin can perform migration",
-			})
-		}
-
-		if err := service.MigratePekerjaanToMongo(); err != nil {
-			return c.Status(500).JSON(fiber.Map{
-				"success": false,
-				"error":   fmt.Sprintf("Migration failed: %v", err),
-			})
-		}
-
-		return c.JSON(fiber.Map{
-			"success": true,
-			"message": "Data migration completed successfully",
-		})
-	})
 
 	// Basic CRUD routes
 	r.Get("/", middleware.AuthRequired(), mongoService.GetAllPekerjaanMongo)
@@ -50,27 +25,4 @@ func MongoPekerjaanRoutes(app fiber.Router) {
 
 	// Search route
 	r.Get("/search", middleware.AuthRequired(), mongoService.SearchPekerjaanMongo)
-
-	// Migration route (admin only)
-	r.Post("/migrate", middleware.AuthRequired(), func(c *fiber.Ctx) error {
-		role := c.Locals("role").(string)
-		if role != "admin" {
-			return c.Status(403).JSON(fiber.Map{
-				"success": false,
-				"error":   "Only admin can perform migration",
-			})
-		}
-
-		if err := service.MigratePekerjaanToMongo(); err != nil {
-			return c.Status(500).JSON(fiber.Map{
-				"success": false,
-				"error":   fmt.Sprintf("Migration failed: %v", err),
-			})
-		}
-
-		return c.JSON(fiber.Map{
-			"success": true,
-			"message": "Data migration completed successfully",
-		})
-	})
 }

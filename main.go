@@ -28,6 +28,9 @@ func main() {
 	route.SetupFileRoutes(api)      // Tambah route untuk upload file
 	route.MongoPekerjaanRoutes(api) // Tambah route untuk MongoDB pekerjaan
 
+	// Swagger / OpenAPI UI (docs served from docs/openapi.json)
+	route.SwaggerRoutes(api)
+
 	// listen server
 	log.Fatal(app.Listen(":3000"))
 }

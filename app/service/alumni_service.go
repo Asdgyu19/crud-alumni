@@ -6,161 +6,140 @@ import (
 	"crud-alumni/app/repository/mongo"
 	"os"
 	"strconv"
-	"strings"
 
 	"github.com/gofiber/fiber/v2"
 )
 
-var (
+type AlumniService struct {
 	useMongoDb   bool
 	postgresRepo repository.AlumniRepository
 	mongoRepo    *mongo.AlumniRepository
-)
-
-func init() {
-	// Check if we should use MongoDB
-	useMongoDb = os.Getenv("USE_MONGODB") == "true"
-
-	if useMongoDb {
-		mongoRepo = mongo.NewAlumniRepository()
-	}
 }
 
-// PostgreSQL functions
-func GetAllAlumni() ([]models.Alumni, error) {
-	if useMongoDb {
-		return mongoRepo.FindAll()
+func NewAlumniService() *AlumniService {
+	s := &AlumniService{
+		useMongoDb: os.Getenv("USE_MONGODB") == "true",
 	}
-	// Original PostgreSQL code
-	return repository.GetAllAlumniRepo()
+
+	if s.useMongoDb {
+		s.mongoRepo = mongo.NewAlumniRepository()
+	}
+
+	return s
 }
 
-func GetAlumniByID(id interface{}) (*models.Alumni, error) {
-	if useMongoDb {
-		stringID, ok := id.(string)
-		if !ok {
-			numID, ok := id.(int)
-			if ok {
-				stringID = strconv.Itoa(numID)
-			}
-		}
-		return mongoRepo.FindByID(stringID)
-	}
-	// Original PostgreSQL code
-	numID, ok := id.(int)
-	if !ok {
-		strID, ok := id.(string)
-		if ok {
-			numID, _ = strconv.Atoi(strID)
-		}
-	}
-	alumni, err := repository.GetAlumniByIDRepo(numID)
-	return &alumni, err
-}
+// Handler methods
+func (s *AlumniService) GetAllAlumni(c *fiber.Ctx) error {
+	var alumni []models.Alumni
+	var err error
 
-func CreateAlumni(a *models.Alumni) error {
-	if useMongoDb {
-		return mongoRepo.Create(a)
-	}
-	// Original PostgreSQL code
-	return repository.CreateAlumniRepo(a)
-}
-
-func UpdateAlumni(id interface{}, a *models.Alumni) error {
-	if useMongoDb {
-		stringID, ok := id.(string)
-		if !ok {
-			numID, ok := id.(int)
-			if ok {
-				stringID = strconv.Itoa(numID)
-			}
-		}
-		return mongoRepo.Update(stringID, a)
-	}
-	// Original PostgreSQL code
-	numID, ok := id.(int)
-	if !ok {
-		strID, ok := id.(string)
-		if ok {
-			numID, _ = strconv.Atoi(strID)
-		}
-	}
-	return repository.UpdateAlumniRepo(numID, a)
-}
-
-func DeleteAlumni(id interface{}) error {
-	if useMongoDb {
-		stringID, ok := id.(string)
-		if !ok {
-			numID, ok := id.(int)
-			if ok {
-				stringID = strconv.Itoa(numID)
-			}
-		}
-		return mongoRepo.Delete(stringID)
-	}
-	// Original PostgreSQL code
-	numID, ok := id.(int)
-	if !ok {
-		strID, ok := id.(string)
-		if ok {
-			numID, _ = strconv.Atoi(strID)
-		}
-	}
-	return repository.DeleteAlumniRepo(numID)
-}
-
-func GetAlumniService(c *fiber.Ctx) error {
-	if useMongoDb {
-		// MongoDB implementation
-		alumni, err := mongoRepo.FindAll()
-		if err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch alumni"})
-		}
-		return c.JSON(fiber.Map{
-			"data": alumni,
-			"meta": fiber.Map{
-				"total": len(alumni),
-			},
-		})
+	if s.useMongoDb {
+		alumni, err = s.mongoRepo.FindAll()
+	} else {
+		alumni, err = repository.GetAllAlumniRepo()
 	}
 
-	// Original PostgreSQL implementation
-	page, _ := strconv.Atoi(c.Query("page", "1"))
-	limit, _ := strconv.Atoi(c.Query("limit", "10"))
-	sortBy := c.Query("sortBy", "id")
-	order := c.Query("order", "asc")
-	search := c.Query("search", "")
-
-	offset := (page - 1) * limit
-
-	whitelist := map[string]bool{"id": true, "nama": true, "angkatan": true, "tahun_lulus": true}
-	if !whitelist[sortBy] {
-		sortBy = "id"
-	}
-	if strings.ToLower(order) != "desc" {
-		order = "asc"
-	}
-
-	data, err := repository.GetAlumniWithFilter(search, sortBy, order, limit, offset)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch alumni"})
+		return c.Status(500).JSON(fiber.Map{"error": "Gagal ambil data"})
+	}
+	return c.JSON(fiber.Map{"success": true, "data": alumni})
+}
+
+func (s *AlumniService) GetAlumniByID(c *fiber.Ctx) error {
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "ID tidak valid"})
 	}
 
-	total, _ := repository.CountAlumni(search)
-
-	response := models.AlumniResponse{
-		Data: data,
-		Meta: models.MetaInfo{
-			Page:   page,
-			Limit:  limit,
-			Total:  total,
-			Pages:  (total + limit - 1) / limit,
-			SortBy: sortBy,
-			Order:  order,
-			Search: search,
-		},
+	var alumni *models.Alumni
+	if s.useMongoDb {
+		alumni, err = s.mongoRepo.FindByID(strconv.Itoa(id))
+	} else {
+		var a models.Alumni
+		a, err = repository.GetAlumniByIDRepo(id)
+		alumni = &a
 	}
 
-	return c.JSON(response)
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Alumni tidak ditemukan"})
+	}
+	return c.JSON(fiber.Map{"success": true, "data": alumni})
+}
+
+func (s *AlumniService) CreateAlumni(c *fiber.Ctx) error {
+	var alumni models.Alumni
+	if err := c.BodyParser(&alumni); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Body tidak valid"})
+	}
+
+	var err error
+	if s.useMongoDb {
+		err = s.mongoRepo.Create(&alumni)
+	} else {
+		err = repository.CreateAlumniRepo(&alumni)
+	}
+
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Gagal insert data"})
+	}
+	return c.Status(201).JSON(fiber.Map{"success": true, "data": alumni})
+}
+
+func (s *AlumniService) UpdateAlumni(c *fiber.Ctx) error {
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "ID tidak valid"})
+	}
+
+	var alumni models.Alumni
+	if err := c.BodyParser(&alumni); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Body tidak valid"})
+	}
+
+	if s.useMongoDb {
+		err = s.mongoRepo.Update(strconv.Itoa(id), &alumni)
+	} else {
+		err = repository.UpdateAlumniRepo(id, &alumni)
+	}
+
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Gagal update"})
+	}
+	return c.JSON(fiber.Map{"success": true, "message": "Data alumni diupdate"})
+}
+
+func (s *AlumniService) DeleteAlumni(c *fiber.Ctx) error {
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "ID tidak valid"})
+	}
+
+	if s.useMongoDb {
+		err = s.mongoRepo.Delete(strconv.Itoa(id))
+	} else {
+		err = repository.DeleteAlumniRepo(id)
+	}
+
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Gagal hapus"})
+	}
+	return c.JSON(fiber.Map{"success": true, "message": "Alumni dihapus"})
+}
+
+func (s *AlumniService) GetAlumniByTahunAndGaji(c *fiber.Ctx) error {
+	tahun, err := strconv.Atoi(c.Params("tahun"))
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Parameter tahun harus angka"})
+	}
+
+	data, err := repository.GetAlumniByTahunAndGajiRepo(tahun)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Gagal mengambil data"})
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"count":   len(data),
+		"data":    data,
+	})
 }

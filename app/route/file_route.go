@@ -14,10 +14,9 @@ func SetupFileRoutes(router fiber.Router) {
 	files.Use(middleware.AuthRequired())
 
 	files.Post("/upload", fileService.UploadFile)
+	files.Post("/upload/foto", fileService.UploadFoto)
+	files.Post("/upload/sertifikat", fileService.UploadSertifikat)
 	files.Get("/", fileService.GetAllFiles)
 	files.Get("/:id", fileService.GetFileByID)
 	files.Delete("/:id", fileService.DeleteFile)
 }
-
-
-

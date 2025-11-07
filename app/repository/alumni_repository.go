@@ -79,7 +79,7 @@ func DeleteAlumniRepo(id int) error {
 }
 
 func GetAlumniWithFilter(search, sortBy, order string, limit, offset int) ([]models.Alumni, error) {
-    query := fmt.Sprintf(`
+	query := fmt.Sprintf(`
         SELECT id, nim, nama, jurusan, angkatan, tahun_lulus, email, no_telepon, alamat, created_at, updated_at
         FROM alumni
         WHERE nama ILIKE $1 OR email ILIKE $1 OR jurusan ILIKE $1
@@ -87,24 +87,52 @@ func GetAlumniWithFilter(search, sortBy, order string, limit, offset int) ([]mod
         LIMIT $2 OFFSET $3
     `, sortBy, order)
 
-    rows, err := database.DB.Query(query, "%"+search+"%", limit, offset)
-    if err != nil {
-        return nil, err
-    }
-    defer rows.Close()
+	rows, err := database.DB.Query(query, "%"+search+"%", limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-    var list []models.Alumni
-    for rows.Next() {
-        var a models.Alumni
-        rows.Scan(&a.ID, &a.NIM, &a.Nama, &a.Jurusan, &a.Angkatan, &a.TahunLulus,
-            &a.Email, &a.NoTelepon, &a.Alamat, &a.CreatedAt, &a.UpdatedAt)
-        list = append(list, a)
-    }
-    return list, nil
+	var list []models.Alumni
+	for rows.Next() {
+		var a models.Alumni
+		rows.Scan(&a.ID, &a.NIM, &a.Nama, &a.Jurusan, &a.Angkatan, &a.TahunLulus,
+			&a.Email, &a.NoTelepon, &a.Alamat, &a.CreatedAt, &a.UpdatedAt)
+		list = append(list, a)
+	}
+	return list, nil
 }
 
 func CountAlumni(search string) (int, error) {
-    var total int
-    err := database.DB.QueryRow(`SELECT COUNT(*) FROM alumni WHERE nama ILIKE $1 OR email ILIKE $1 OR jurusan ILIKE $1`, "%"+search+"%").Scan(&total)
-    return total, err
+	var total int
+	err := database.DB.QueryRow(`SELECT COUNT(*) FROM alumni WHERE nama ILIKE $1 OR email ILIKE $1 OR jurusan ILIKE $1`, "%"+search+"%").Scan(&total)
+	return total, err
+}
+
+func GetAlumniByTahunAndGajiRepo(tahun int) ([]models.Result, error) {
+	rows, err := database.DB.Query(`
+        SELECT a.id, a.nama, a.jurusan, a.tahun_lulus,
+               p.bidang_industri, p.nama_perusahaan, p.posisi_jabatan, p.gaji_range
+        FROM alumni a
+        JOIN pekerjaan_alumni p ON a.id = p.alumni_id
+        WHERE a.tahun_lulus = $1 
+          AND p.gaji_range >= 4000000 
+          AND p.status_pekerjaan = 'aktif'
+    `, tahun)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var data []models.Result
+	for rows.Next() {
+		var r models.Result
+		if err := rows.Scan(&r.ID, &r.Nama, &r.Jurusan, &r.TahunLulus,
+			&r.BidangIndustri, &r.NamaPerusahaan, &r.PosisiJabatan, &r.RangeGaji); err != nil {
+			return nil, err
+		}
+		data = append(data, r)
+	}
+
+	return data, nil
 }

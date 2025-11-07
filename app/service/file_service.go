@@ -121,7 +121,6 @@ func (s *FileService) GetAllFiles(c *fiber.Ctx) error {
 	})
 }
 
-// GetFileByID returns a specific file by ID
 func (s *FileService) GetFileByID(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -139,11 +138,9 @@ func (s *FileService) GetFileByID(c *fiber.Ctx) error {
 	})
 }
 
-// DeleteFile removes a file by ID
 func (s *FileService) DeleteFile(c *fiber.Ctx) error {
 	id := c.Params("id")
 
-	// Get file info first
 	file, err := s.fileRepo.FindByID(id)
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{
@@ -151,25 +148,176 @@ func (s *FileService) DeleteFile(c *fiber.Ctx) error {
 			"message": "File not found",
 		})
 	}
-
-	// Delete physical file
 	if err := os.Remove(file.FilePath); err != nil && !os.IsNotExist(err) {
 		return c.Status(500).JSON(fiber.Map{
 			"status":  "error",
 			"message": "Could not delete physical file",
 		})
 	}
-
-	// Delete from database
 	if err := s.fileRepo.Delete(id); err != nil {
 		return c.Status(500).JSON(fiber.Map{
 			"status":  "error",
 			"message": "Could not delete file record from database",
 		})
 	}
-
 	return c.JSON(fiber.Map{
 		"status":  "success",
 		"message": "File deleted successfully",
+	})
+}
+
+// UploadFoto handles foto upload with specific validation
+func (s *FileService) UploadFoto(c *fiber.Ctx) error {
+	// Get uploaded file
+	file, err := c.FormFile("file")
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"status":  "error",
+			"message": "No file uploaded",
+		})
+	}
+
+	// Validasi ukuran file (maksimal 1MB)
+	if file.Size > 1*1024*1024 {
+		return c.Status(400).JSON(fiber.Map{
+			"status":  "error",
+			"message": "File size exceeds 1MB limit",
+		})
+	}
+
+	// Validasi tipe file (hanya jpg, jpeg, png)
+	ext := filepath.Ext(file.Filename)
+	allowedTypes := map[string]bool{
+		".jpg":  true,
+		".jpeg": true,
+		".png":  true,
+	}
+
+	if !allowedTypes[ext] {
+		return c.Status(400).JSON(fiber.Map{
+			"status":  "error",
+			"message": "File type not allowed. Only jpg, jpeg, png are allowed",
+		})
+	}
+
+	// Buat direktori uploads/foto jika belum ada
+	uploadDir := "./uploads/foto"
+	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"status":  "error",
+			"message": "Could not create upload directory",
+		})
+	}
+
+	// Generate nama file unik
+	filename := fmt.Sprintf("%d%s", time.Now().UnixNano(), ext)
+	filePath := fmt.Sprintf("%s/%s", uploadDir, filename)
+
+	// Simpan file
+	if err := c.SaveFile(file, filePath); err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"status":  "error",
+			"message": "Could not save file",
+		})
+	}
+
+	// Buat record file di database
+	fileModel := &models.File{
+		FileName:  file.Filename,
+		FileType:  ext,
+		FilePath:  filePath,
+		FileSize:  file.Size,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	if err := s.fileRepo.Create(fileModel); err != nil {
+		// Hapus file jika gagal menyimpan ke database
+		os.Remove(filePath)
+		return c.Status(500).JSON(fiber.Map{
+			"status":  "error",
+			"message": "Could not save file information to database",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"status":  "success",
+		"message": "Foto uploaded successfully",
+		"data":    fileModel,
+	})
+}
+
+// UploadSertifikat handles sertifikat upload with specific validation
+func (s *FileService) UploadSertifikat(c *fiber.Ctx) error {
+	// Get uploaded file
+	file, err := c.FormFile("file")
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"status":  "error",
+			"message": "No file uploaded",
+		})
+	}
+
+	// Validasi ukuran file (maksimal 2MB)
+	if file.Size > 2*1024*1024 {
+		return c.Status(400).JSON(fiber.Map{
+			"status":  "error",
+			"message": "File size exceeds 2MB limit",
+		})
+	}
+
+	// Validasi tipe file (hanya pdf)
+	ext := filepath.Ext(file.Filename)
+	if ext != ".pdf" {
+		return c.Status(400).JSON(fiber.Map{
+			"status":  "error",
+			"message": "File type not allowed. Only PDF is allowed",
+		})
+	}
+
+	// Buat direktori uploads/sertifikat jika belum ada
+	uploadDir := "./uploads/sertifikat"
+	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"status":  "error",
+			"message": "Could not create upload directory",
+		})
+	}
+
+	// Generate nama file unik
+	filename := fmt.Sprintf("%d%s", time.Now().UnixNano(), ext)
+	filePath := fmt.Sprintf("%s/%s", uploadDir, filename)
+
+	// Simpan file
+	if err := c.SaveFile(file, filePath); err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"status":  "error",
+			"message": "Could not save file",
+		})
+	}
+
+	// Buat record file di database
+	fileModel := &models.File{
+		FileName:  file.Filename,
+		FileType:  ext,
+		FilePath:  filePath,
+		FileSize:  file.Size,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	if err := s.fileRepo.Create(fileModel); err != nil {
+		// Hapus file jika gagal menyimpan ke database
+		os.Remove(filePath)
+		return c.Status(500).JSON(fiber.Map{
+			"status":  "error",
+			"message": "Could not save file information to database",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"status":  "success",
+		"message": "Sertifikat uploaded successfully",
+		"data":    fileModel,
 	})
 }
