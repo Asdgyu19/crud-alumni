@@ -17,6 +17,51 @@
       }
     },
     "schemas": {
+      "Alumni": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "nim": { "type": "string" },
+          "nama": { "type": "string" },
+          "jurusan": { "type": "string" },
+          "angkatan": { "type": "integer" },
+          "tahun_lulus": { "type": "integer" },
+          "email": { "type": "string" },
+          "no_telepon": { "type": "string" },
+          "alamat": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "AlumniResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Alumni"
+            }
+          }
+        }
+      },
+      "Pekerjaan": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "alumni_id": { "type": "integer" },
+          "nama_perusahaan": { "type": "string" },
+          "posisi_jabatan": { "type": "string" },
+          "bidang_industri": { "type": "string" },
+          "lokasi_kerja": { "type": "string" },
+          "gaji_range": { "type": "number" },
+          "tanggal_mulai_kerja": { "type": "string", "format": "date" },
+          "status_pekerjaan": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" },
+          "deleted_at": { "type": "string", "format": "date-time", "nullable": true }
+        }
+      },
       "LoginRequest": {
         "type": "object",
         "properties": {
@@ -167,6 +212,217 @@
           { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
         ],
         "responses": { "200": { "description": "Pekerjaan" }, "404": { "description": "Not found" } }
+      }
+    },
+    "/alumni": {
+      "get": {
+        "tags": ["Alumni"],
+        "summary": "Get all alumni",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of alumni",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlumniResponse"
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Alumni"],
+        "summary": "Create new alumni (Admin only)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Alumni"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Alumni created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "$ref": "#/components/schemas/Alumni" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Forbidden - Admin only" }
+        }
+      }
+    },
+    "/alumni/{id}": {
+      "get": {
+        "tags": ["Alumni"],
+        "summary": "Get alumni by ID",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Alumni details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "$ref": "#/components/schemas/Alumni" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Alumni not found" }
+        }
+      },
+      "put": {
+        "tags": ["Alumni"],
+        "summary": "Update alumni (Admin only)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Alumni"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Alumni updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Forbidden - Admin only" },
+          "404": { "description": "Alumni not found" }
+        }
+      },
+      "delete": {
+        "tags": ["Alumni"],
+        "summary": "Delete alumni (Admin only)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Alumni deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Forbidden - Admin only" },
+          "404": { "description": "Alumni not found" }
+        }
+      }
+    },
+    "/alumni/tahun/{tahun}": {
+      "get": {
+        "tags": ["Alumni"],
+        "summary": "Get alumni by tahun lulus with gaji >= 4jt",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "tahun",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Alumni with high salary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "count": { "type": "integer" },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "integer" },
+                          "nama": { "type": "string" },
+                          "jurusan": { "type": "string" },
+                          "tahun_lulus": { "type": "integer" },
+                          "bidang_industri": { "type": "string" },
+                          "nama_perusahaan": { "type": "string" },
+                          "posisi_jabatan": { "type": "string" },
+                          "range_gaji": { "type": "number" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid year parameter" },
+          "401": { "description": "Unauthorized" }
+        }
       }
     }
   }

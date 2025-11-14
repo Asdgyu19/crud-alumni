@@ -36,6 +36,7 @@ require (
 	github.com/goccy/go-yaml v1.18.0 // indirect
 	github.com/gofiber/utils v0.0.10 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/gorilla/schema v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect

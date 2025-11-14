@@ -2,7 +2,6 @@ package route
 
 import (
 	"crud-alumni/app/service"
-
 	"github.com/gofiber/fiber/v2"
 )
 

@@ -1,8 +1,8 @@
 package main
 
 import (
-	"crud-alumni/app/route"
 	"crud-alumni/database"
+	"crud-alumni/route"
 	"log"
 
 	"github.com/gofiber/fiber/v2"
